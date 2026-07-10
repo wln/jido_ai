@@ -864,6 +864,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     timeout_ms = normalize_timeout(config.tool_exec[:timeout_ms])
     telemetry_metadata = %{call_id: pending_call.id, tool_call_id: pending_call.id}
 
+    # Expose the provider tool-call id to the executing tool (same
+    # rationale as Turn.run_single_tool) — the ReAct runner is the
+    # live execution path and bypasses Turn.
+    context = put_tool_call_id(context, pending_call.id)
+
     result =
       safe_execute_module(module, pending_call.arguments, context,
         timeout: timeout_ms,
@@ -1514,6 +1519,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp normalize_timeout(value) when is_integer(value) and value > 0, do: value
   defp normalize_timeout(_), do: 15_000
+
+  defp put_tool_call_id(context, ""), do: context
+
+  defp put_tool_call_id(context, call_id) when is_map(context) and is_binary(call_id),
+    do: Map.put(context, :tool_call_id, call_id)
+
+  defp put_tool_call_id(context, _call_id), do: context
 
   defp normalize_retry_count(value) when is_integer(value) and value >= 0, do: value
   defp normalize_retry_count(_), do: 0
