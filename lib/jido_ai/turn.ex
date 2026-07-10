@@ -818,6 +818,13 @@ defmodule Jido.AI.Turn do
   defp tool_call_telemetry_metadata(""), do: nil
   defp tool_call_telemetry_metadata(call_id), do: %{call_id: call_id, tool_call_id: call_id}
 
+  defp put_tool_call_id(context, ""), do: context
+
+  defp put_tool_call_id(context, call_id) when is_map(context),
+    do: Map.put(context, :tool_call_id, call_id)
+
+  defp put_tool_call_id(context, _call_id), do: context
+
   defp run_single_tool(tool_call, context, tools, timeout) do
     call_id = normalize_text(extract_tool_call_id(tool_call))
     tool_name = normalize_text(extract_tool_call_name(tool_call))
@@ -834,7 +841,10 @@ defmodule Jido.AI.Turn do
           {:error, Error.error_envelope(:validation, "Missing tool name"), []}
 
         _ ->
-          execute(tool_name, arguments, context, exec_opts)
+          # Expose the provider tool-call id to the executing tool so
+          # callers can correlate per-call side-channel state with the
+          # corresponding completion event.
+          execute(tool_name, arguments, put_tool_call_id(context, call_id), exec_opts)
       end
 
     %{
